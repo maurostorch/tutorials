@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title></title>
+    </head>
+    <body>
+        <button type="button" name="button" onclick="getcontext()">Context</button>
+        <button type="button" name="button" onclick="newpeer()">Connect</button>
+        <div id="link"></div>
+        <input type="text" name="msg" value=""><button type="button" name="button" onclick="send()">Send</button>
+        <div id="messages"></div>
+        <script type="text/javascript" src="js/peer.js"></script>
+        <script type="text/javascript">
+            function send() {
+                var value = document.querySelector('[name=msg]').value;
+                sendMessage(value);
+            }
+            var peerList = [];
+            function message(m){
+                var area = document.querySelector('#messages');
+                area.innerHTML = new Date().toLocaleString() + ': ' + m + '<br>'+ area.innerHTML;
+                try{
+                    m=JSON.parse(m);
+                } catch(e) {
+                    console.log('it is not a object');
+                }
+                console.log(m);
+            }
+            function sendMessage(m) {
+                if (m instanceof Object) {
+                    m = JSON.stringify(m);
+                }
+                var l = peerList.length;
+                for(var i=0;i<l;i++) {
+                    peerList[i].sendMessage(m);
+                }
+            }
+            function getcontext() {
+                newcontext(function(a){
+                    document.getElementById('link').innerHTML=a;
+                });
+            }
+            function newcontext(callback) {
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET','/peer/context',true);
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState == 4 && xhr.status == 200) {
+                        callback(xhr.response);
+                    }
+                }
+                xhr.send();
+            }
+            function updatecontext(c) {
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST','/peer/context/'+c,true);
+                xhr.send();
+            }
+            function newpeer(){
+                var p = new Peer();
+                peerList.push(p);
+                p.event.addListener(function(m){message(m);},'message');
+                p.publishCandidates = function(e) {
+                    if(!e) return;
+                    console.log("receiving candidate:",e);
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST','/peer/candidate',true);
+                    xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+                    xhr.send(JSON.stringify(e));
+                };
+                p.connect();
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET','/peer/offer',true);
+                xhr.onreadystatechange = function(){
+                    if (xhr.readyState == 4 && xhr.status == 200){
+                        var data = JSON.parse(xhr.responseText);
+                        console.log("receifing offer:",data);
+                        p.setRemoteDescription(data, function(desc){
+                            console.log("returning awnser:",desc)
+                            var xxhr = new XMLHttpRequest();
+                            xxhr.open('POST','/peer/awnser',true);
+                            xxhr.onreadystatechange = function() {
+                                if(xxhr.readyState == 4 && xhr.status == 200) {
+                                    //setTimeout(newpeer,1000);
+                                }
+                            }
+                            xxhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+                            xxhr.send(JSON.stringify(desc));
+                        });
+                    } else if(xhr.readyState == 4 && xhr.status == 404) {
+                        p.offer(function(desc){
+                            console.log("sending offer:",desc);
+                            var xxhr = new XMLHttpRequest();
+                            xxhr.open('POST','/peer/offer',true);
+                            xxhr.onreadystatechange = function(){
+                                if (xxhr.readyState == 4 && xxhr.status == 200){
+                                    var s = new EventSource('/peer/offer/stream');
+                                    s.addEventListener('message', function(e) {
+                                        var data = JSON.parse(e.data);
+                                        console.log("received awnser:", data);
+                                        p.setRemoteDescription(data);
+                                        //setTimeout(newpeer,1000);
+                                    }, false);
+                                    var ss = new EventSource('/peer/candidate/stream');
+                                    ss.addEventListener('message',function(e) {
+                                        var data = JSON.parse(e.data);
+                                        console.log("received candidade:",data);
+                                        p.receiveCandidates(data);
+                                    },false);
+                                }
+                            };
+                            xxhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+                            xxhr.send(JSON.stringify(desc));
+                        });
+                    }
+                };
+                xhr.send();
+            };
+        </script>
+    </body>
+</html>
