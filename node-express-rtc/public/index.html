@@ -8,8 +8,11 @@
         <button type="button" name="button" onclick="getcontext()">Context</button>
         <button type="button" name="button" onclick="newpeer()">Connect</button>
         <div id="link"></div>
-        <input type="text" name="msg" value=""><button type="button" name="button" onclick="send()">Send</button>
+        <input type="text" name="msg" value=""><button type="button" name="button" onclick="send()">Send</button><br>
+        <input type="file" name="file" value=""><button type="button" name="button" onclick="sendFile()">Send</button>
         <div id="messages"></div>
+        <div id="files"></div>
+        <script type="text/javascript" src="js/qrcode.min.js"></script>
         <script type="text/javascript" src="js/peer.js"></script>
         <script type="text/javascript">
             function send() {
@@ -36,9 +39,30 @@
                     peerList[i].sendMessage(m);
                 }
             }
+            function sendFile() {
+                var inputFile = document.querySelector('[name=file]');
+                var file = inputFile.files[0];
+                var l = peerList.length;
+                for(var i=0;i<l;i++) {
+                    peerList[i].sendFile(file);
+                }
+            }
+            function receiveFile(file) {
+                var files = document.getElementById('files');
+                var a = document.createElement('a');
+                a.href=file.url;
+                a.download=file.filename;
+                a.textContent=file.filename;
+                files.appendChild(a);
+            }
             function getcontext() {
                 newcontext(function(a){
-                    document.getElementById('link').innerHTML=a;
+                    a = JSON.parse(a);
+                    var link = document.createElement('a');
+                    link.href=window.location.protocol+'//'+window.location.hostname+(window.location.port?':'+window.location.port:'')+'/peer/dashboard/'+a.context;
+                    link.textContent=link.href;
+                    new QRCode(document.getElementById('link'), link.href);
+                    document.getElementById('link').appendChild(link);
                 });
             }
             function newcontext(callback) {
@@ -60,6 +84,7 @@
                 var p = new Peer();
                 peerList.push(p);
                 p.event.addListener(function(m){message(m);},'message');
+                p.event.addListener(function(m){receiveFile(m);},'file');
                 p.publishCandidates = function(e) {
                     if(!e) return;
                     console.log("receiving candidate:",e);

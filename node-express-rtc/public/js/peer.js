@@ -32,10 +32,16 @@ Peer.prototype = {
         var that = this;
         this.iam = 'offer';
         this.sendChannel = this.localConnection.createDataChannel('sendDataChannel',this.config.dataConstraint);
-        this.sendChannel.onmessage = function(e){that.onMessage(e);};
+        this.sendChannel.onmessage = function(e){that.onMessage(e,'message');};
         this.sendChannel.onopen = function(){that.onSendChannelStateChange();};
         this.sendChannel.onclose = function(){that.onSendChannelStateChange();};
         this.sendChannel.onerror = function(){that.onSendChannelStateChange();};
+        this.fileChannel = this.localConnection.createDataChannel('sendFileChannel',this.config.dataConstraint);
+        this.fileChannel.binaryType = 'arraybuffer';
+        this.fileChannel.onmessage = function(e){that.onMessage(e,'file');};
+        this.fileChannel.onopen = function(){that.onSendChannelStateChange();};
+        this.fileChannel.onclose = function(){that.onSendChannelStateChange();};
+        this.fileChannel.onerror = function(){that.onSendChannelStateChange();};
         var c = callback;
         var f = function(desc){
             that.localConnection.setLocalDescription(desc);
@@ -87,16 +93,50 @@ Peer.prototype = {
         channel.onopen = f;
         channel.onclose = f;
     },
-    onMessage: function(e) {
-        this.event.notify(e.data,'message');
+    recBuffer: [],
+    expectedFileSize: -1,
+    expectedFileName: '',
+    onMessage: function(e,type) {
+        if(type=='file') {
+            this.recBuffer.push(e.data);
+            var l = this.recBuffer.length, c=0;
+            for(var i=0;i<l;i++) {
+                c +=this.recBuffer[i].byteLength;
+            }
+            console.log(c + ' expected size is '+this.expectedFileSize);
+            if (c==this.expectedFileSize) {
+                var received = new window.Blob(this.recBuffer);
+                this.recBuffer = [];
+                this.expectedFileSize = -1;
+                var r = {filename:this.expectedFileName,url:URL.createObjectURL(received)};
+                this.event.notify(r,type);
+            }
+        } else {
+            if (type=='message' && e.data.indexOf('filesize')>0) {
+                var data = JSON.parse(e.data);
+                this.expectedFileSize = data.filesize;
+                this.expectedFileName = data.filename;
+            } else {
+                this.event.notify(e.data,type);
+            }
+        }
     },
     onDataChannel: function(e){
         var that = this;
-        this.sendChannel = e.channel;
-        this.sendChannel.onmessage = function(e){that.onMessage(e);};
-        this.sendChannel.onopen = function(){that.onSendChannelStateChange();};
-        this.sendChannel.onclose = function(){that.onSendChannelStateChange();};
-        this.sendChannel.onerror = function(){that.onSendChannelStateChange();};
+        if(e.channel.label == 'sendDataChannel') {
+            this.sendChannel = e.channel;
+            this.sendChannel.onmessage = function(e){that.onMessage(e,'message');};
+            this.sendChannel.onopen = function(){that.onSendChannelStateChange();};
+            this.sendChannel.onclose = function(){that.onSendChannelStateChange();};
+            this.sendChannel.onerror = function(){that.onSendChannelStateChange();};
+        } else {
+            this.fileChannel = e.channel;
+            this.fileChannel.binaryType = 'arraybuffer';
+            this.fileChannel.onmessage = function(e){that.onMessage(e,'file');};
+            this.fileChannel.onopen = function(){that.onSendChannelStateChange();};
+            this.fileChannel.onclose = function(){that.onSendChannelStateChange();};
+            this.fileChannel.onerror = function(){that.onSendChannelStateChange();};
+        }
         console.log("new data channel",this.sendChannel);
     },
     publishCandidates: null,
@@ -117,6 +157,26 @@ Peer.prototype = {
     sendMessage: function(m) {
         if(m && m.trim().length > 0)
             this.sendChannel.send(m);
+    },
+    sendFile: function(file) {
+        this.sendChannel.send(JSON.stringify({filesize:file.size, filename:file.name}));
+        var that = this;
+        var chunkSize = 16384;
+        var sliceFile = function(offset) {
+            var reader = new window.FileReader();
+            reader.onload = (function() {
+                return function(e) {
+                    that.fileChannel.send(e.target.result);
+                    if (file.size > offset + e.target.result.byteLength) {
+                        window.setTimeout(sliceFile, 0, offset + chunkSize);
+                    }
+                    //sendProgress.value = offset + e.target.result.byteLength;
+                };
+            })(file);
+            var slice = file.slice(offset, offset + chunkSize);
+            reader.readAsArrayBuffer(slice);
+        };
+        sliceFile(0);
     },
     event: {
         listeners: {},
