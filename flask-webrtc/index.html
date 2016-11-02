@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title></title>
+        <style media="screen">
+            div div {
+                border: 1px solid black;
+            }
+            p {
+                border: 1px dotted black;
+            }
+        </style>
+    </head>
+    <body>
+        <input id="callid"/>
+        <button id="offerBtn">Start Offer</button>
+        <button id="answerBtn">Start Answer</button>
+        <div class="">
+            <input type="text" id="msg" placeholder="type a message [Enter do send]" autofocus>
+        </div>
+        <div class="container">
+        </div>
+        <script type="text/javascript" src="peer.js"></script>
+        <script type="text/javascript">
+            var msgfield = document.querySelector('#msg');
+            msgfield.onkeyup = function(e) {
+                if (e.key === 'Enter') {
+                    if (dataChannel.readyState == 'open') {
+                        dataChannel.send(msgfield.value);
+                        msgfield.value='';
+                    }
+                }
+            }
+        </script>
+    </body>
+</html>
