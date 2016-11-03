@@ -4,9 +4,11 @@ var Peer = function(config) {
         this.config = config;
     } else {
         this.config = {
-            iceServers: [{
-                'url': 'stun:stun.l.google.com:19302'
-            }],
+            iceServers: [
+                { 'url': 'stun:stun.schlund.de'},
+		        { 'url': 'stun:stun3.l.google.com:19302'},
+                { 'url': 'stun:stun.l.google.com:19302'}
+            ],
             pcConstraint: null,
             dataConstraint: null
         };
@@ -15,7 +17,7 @@ var Peer = function(config) {
 Peer.prototype = {
     connect: function() {
         if(!this.publishCandidates) {
-            this.log('should specify publishCandidates(e) function.');
+            this.event.notify('should specify publishCandidates(e) function.','log');
             return;
         }
         //this.localConnection = new RTCPeerConnection(this.config.iceServers, this.config.pcConstraint);
@@ -26,28 +28,75 @@ Peer.prototype = {
         var that = this;
         this.localConnection.onicecandidate = function(e){that.publishCandidates(e.candidate)};
         this.localConnection.ondatachannel = function(e){that.onDataChannel(e);};
+        this.localConnection.onnegotiationneeded = function() {
+            console.log('negotiation needed');
+        }
+        this.localConnection.onconnectionstatechange = function(event) {
+            console.log(that.localConnection.connectionState);
+        }
+        this.localConnection.onsignalingstatechange = function(e) {
+            console.log(that.localConnection.signalingState)
+        }
     },
-    sendChannel: null,
+    channelList: [],
+    getChannel: function(channelName) {
+        var l=this.channelList.length, found = false;
+        for(var i=0;i<l;i++) {
+            if (this.channelList[i].label == channelName) {
+                return this.channelList[i];
+            }
+        }
+        return null;
+    },
+    removeChannel: function(channelName) {
+        var l=this.channelList.length, found = false;
+        for(var i=0;i<l;i++) {
+            if (this.channelList[i].label == channelName) {
+                found=true;
+            }
+            if(found && i+1 < l) {
+                this.channelList[i] = this.channelList[i+1];
+            }
+        }
+        if(found) {
+            this.channelList.pop();
+        }
+    },
+    addChannel: function(channel) {
+        var l=this.channelList.length, found = false;
+        for(var i=0;i<l;i++) {
+            if (this.channelList[i].label == channel.label) {
+                found=true;
+                this.channelList[i] = channel;
+                break;
+            }
+        }
+        if(!found) {
+            this.channelList.push(channel);
+        }
+    },
     offer: function(callback) {
         var that = this;
         this.iam = 'offer';
-        this.sendChannel = this.localConnection.createDataChannel('sendDataChannel',this.config.dataConstraint);
-        this.sendChannel.onmessage = function(e){that.onMessage(e,'message');};
-        this.sendChannel.onopen = function(){that.onSendChannelStateChange();};
-        this.sendChannel.onclose = function(){that.onSendChannelStateChange();};
-        this.sendChannel.onerror = function(){that.onSendChannelStateChange();};
-        this.fileChannel = this.localConnection.createDataChannel('sendFileChannel',this.config.dataConstraint);
-        this.fileChannel.binaryType = 'arraybuffer';
-        this.fileChannel.onmessage = function(e){that.onMessage(e,'file');};
-        this.fileChannel.onopen = function(){that.onSendChannelStateChange();};
-        this.fileChannel.onclose = function(){that.onSendChannelStateChange();};
-        this.fileChannel.onerror = function(){that.onSendChannelStateChange();};
+        this.createChannel('sendDataChannel');
+        this.createChannel('sendFileChannel');
+        this.getChannel('sendFileChannel').binaryType='arraybuffer';
         var c = callback;
         var f = function(desc){
             that.localConnection.setLocalDescription(desc);
+
             c(desc);
         };
-        this.localConnection.createOffer().then(f,function(err){this.log(e);});
+        this.localConnection.createOffer().then(f,function(err){that.event.notify(err,'log');});
+    },
+    createChannel: function(channelName) {
+        var that = this;
+        var channel = this.localConnection.createDataChannel(channelName,this.config.dataConstraint);
+        channel.onmessage = function(e){that.onMessage(e,channelName);};
+        channel.onopen = this.onSendChannelStateChange;
+        channel.onclose = this.onSendChannelStateChange;
+        channel.onerror = this.onSendChannelStateChange;
+        this.addChannel(channel);
     },
     setLocalDescription: function(desc){
         var session = new RTCSessionDescription();
@@ -68,6 +117,14 @@ Peer.prototype = {
         } else {
             session = desc;
         }
+        var l =this.channelList.length;
+        console.log(this.channelList);
+        var that = this;
+        this.channelList.forEach(function(c){
+            if(c.readyState != 'connecting') {
+                that.createChannel(c.label);
+            }
+        });
         this.localConnection.setRemoteDescription(session);
         if(this.iam == 'awnser'){
             var c = callback;
@@ -77,33 +134,24 @@ Peer.prototype = {
                 c(desc);
             };
             var that = this;
-            this.localConnection.createAnswer().then(f,function(err){that.log(err);});
+            this.localConnection.createAnswer().then(f,function(err){that.event.notifyy(err,'log');});
         }
     },
     onSendChannelStateChange: function(){
-        var readyState = this.sendChannel.readyState;
-        this.log('Send channel state is: ' + readyState);
-        this.event.notify(readyState,'sendChannel');
-    },
-    handleReceiveChannelStates: function(channel){
-        var that = this;
-        var f = function(){
-            that.event.notify(channel.readyState,'recChannel');
-        }
-        channel.onopen = f;
-        channel.onclose = f;
+        var readyState = this.readyState;
+        console.log(this.label+' state is: ' + readyState);
     },
     recBuffer: [],
     expectedFileSize: -1,
     expectedFileName: '',
     onMessage: function(e,type) {
-        if(type=='file') {
+        if(type=='sendFileChannel') {
             this.recBuffer.push(e.data);
             var l = this.recBuffer.length, c=0;
             for(var i=0;i<l;i++) {
                 c +=this.recBuffer[i].byteLength;
             }
-            console.log(c + ' expected size is '+this.expectedFileSize);
+            this.event.notify(c + ' expected size is '+this.expectedFileSize,'log');
             if (c==this.expectedFileSize) {
                 var received = new window.Blob(this.recBuffer);
                 this.recBuffer = [];
@@ -112,7 +160,7 @@ Peer.prototype = {
                 this.event.notify(r,type);
             }
         } else {
-            if (type=='message' && e.data.indexOf('filesize')>0) {
+            if (type=='sendDataChannel' && e.data.indexOf('filesize')>0) {
                 var data = JSON.parse(e.data);
                 this.expectedFileSize = data.filesize;
                 this.expectedFileName = data.filename;
@@ -123,21 +171,15 @@ Peer.prototype = {
     },
     onDataChannel: function(e){
         var that = this;
-        if(e.channel.label == 'sendDataChannel') {
-            this.sendChannel = e.channel;
-            this.sendChannel.onmessage = function(e){that.onMessage(e,'message');};
-            this.sendChannel.onopen = function(){that.onSendChannelStateChange();};
-            this.sendChannel.onclose = function(){that.onSendChannelStateChange();};
-            this.sendChannel.onerror = function(){that.onSendChannelStateChange();};
-        } else {
-            this.fileChannel = e.channel;
-            this.fileChannel.binaryType = 'arraybuffer';
-            this.fileChannel.onmessage = function(e){that.onMessage(e,'file');};
-            this.fileChannel.onopen = function(){that.onSendChannelStateChange();};
-            this.fileChannel.onclose = function(){that.onSendChannelStateChange();};
-            this.fileChannel.onerror = function(){that.onSendChannelStateChange();};
-        }
-        console.log("new data channel",this.sendChannel);
+        var c = e.channel;
+        this.addChannel(c);
+        c.onmessage = function(e){that.onMessage(e,c.label);};
+        c.onopen = this.onSendChannelStateChange;
+        c.onclose = this.onSendChannelStateChange;
+        c.onerror = this.onSendChannelStateChange;
+        if (c.label=='sendFileChannel')
+            c.binaryType='arraybuffer';
+        this.event.notify("new data channel"+JSON.stringify(c),'log');
     },
     publishCandidates: null,
     receiveCandidates: function(e){
@@ -150,23 +192,33 @@ Peer.prototype = {
             } else {
                 session = e;
             }
-            console.log(session);
-            this.localConnection.addIceCandidate(session);
+            this.event.notify(session,'log');
+            this.localConnection.addIceCandidate(session, function(e){console.log(e);}, function(e){console.log(e);});
         }
     },
     sendMessage: function(m) {
-        if(m && m.trim().length > 0)
-            this.sendChannel.send(m);
+        if(m && m.trim().length > 0) {
+            if(this.getChannel('sendDataChannel')==null || this.getChannel('sendDataChannel').readyState != 'open') {
+                //this.channelList['sendDataChannel']=null;
+                this.createChannel('sendDataChannel');
+            }
+            this.getChannel('sendDataChannel').send(m);
+        }
     },
     sendFile: function(file) {
-        this.sendChannel.send(JSON.stringify({filesize:file.size, filename:file.name}));
+        if(file==null || file.name == null) return;
+        if(this.getChannel('sendFileChannel')==null || this.getChannel('sendFileChannel').readyState != 'open') {
+            //this.getChannel['sendFileChannel']=null;
+            this.createChannel('sendFileChannel');
+        }
+        this.getChannel('sendDataChannel').send(JSON.stringify({filesize:file.size, filename:file.name}));
         var that = this;
         var chunkSize = 16384;
         var sliceFile = function(offset) {
             var reader = new window.FileReader();
             reader.onload = (function() {
                 return function(e) {
-                    that.fileChannel.send(e.target.result);
+                    that.getChannel('sendFileChannel').send(e.target.result);
                     if (file.size > offset + e.target.result.byteLength) {
                         window.setTimeout(sliceFile, 0, offset + chunkSize);
                     }
@@ -202,7 +254,6 @@ Peer.prototype = {
         notify: function(o,t) {
             if(!t) t='default';
             if (this.listeners[t]==null) this.listeners[t]=[];
-            console.log(this);
             var l = this.listeners[t].length;
             for(var i=0;i<l;i++) {
                 this.listeners[t][i](o);

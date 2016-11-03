@@ -3,6 +3,17 @@
     <head>
         <meta charset="utf-8">
         <title></title>
+        <style media="screen">
+            #log {
+                display: none;
+            }
+            #files {
+                float: left;
+            }
+            #messages {
+                float: left;
+            }
+        </style>
     </head>
     <body>
         <button type="button" name="button" onclick="getcontext()">Context</button>
@@ -12,9 +23,16 @@
         <input type="file" name="file" value=""><button type="button" name="button" onclick="sendFile()">Send</button>
         <div id="messages"></div>
         <div id="files"></div>
+        <div id="log"></div>
         <script type="text/javascript" src="js/qrcode.min.js"></script>
         <script type="text/javascript" src="js/peer.js"></script>
         <script type="text/javascript">
+            function log(m) {
+                var s = document.createElement('span');
+                s.appendChild(document.createTextNode(m));
+                document.getElementById('log').appendChild(s);
+                document.getElementById('log').appendChild(document.createElement('br'));
+            }
             function send() {
                 var value = document.querySelector('[name=msg]').value;
                 sendMessage(value);
@@ -61,8 +79,9 @@
                     var link = document.createElement('a');
                     link.href=window.location.protocol+'//'+window.location.hostname+(window.location.port?':'+window.location.port:'')+'/peer/dashboard/'+a.context;
                     link.textContent=link.href;
-                    new QRCode(document.getElementById('link'), link.href);
-                    document.getElementById('link').appendChild(link);
+                    new QRCode(document.getElementById('link'), {width:128, height:128 ,text:link.href});
+                    var divlink = document.getElementById('link');
+                    divlink.appendChild(link);
                 });
             }
             function newcontext(callback) {
@@ -83,8 +102,9 @@
             function newpeer(){
                 var p = new Peer();
                 peerList.push(p);
-                p.event.addListener(function(m){message(m);},'message');
-                p.event.addListener(function(m){receiveFile(m);},'file');
+                p.event.addListener(function(m){log(m)},'log')
+                p.event.addListener(function(m){message(m);},'sendDataChannel');
+                p.event.addListener(function(m){receiveFile(m);},'sendFileChannel');
                 p.publishCandidates = function(e) {
                     if(!e) return;
                     console.log("receiving candidate:",e);
