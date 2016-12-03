@@ -13,11 +13,11 @@
         </style>
     </head>
     <body>
-        <input id="callid"/>
+        <!--input id="callid"/>
         <button id="offerBtn">Start Offer</button>
-        <button id="answerBtn">Start Answer</button>
+        <button id="answerBtn">Start Answer</button-->
         <div class="">
-            <input type="text" id="msg" placeholder="type a message [Enter do send]" autofocus>
+            <input type="text" id="msg" size="30" placeholder="type a message [Enter do send]" autofocus>
         </div>
         <div class="container">
         </div>
@@ -27,8 +27,13 @@
             msgfield.onkeyup = function(e) {
                 if (e.key === 'Enter') {
                     if (dataChannel.readyState == 'open') {
-                        dataChannel.send(msgfield.value);
-                        msgfield.value='';
+                        try {
+                            dataChannel.send(msgfield.value);
+                        } catch (e) {
+                            console.log(e);
+                        } finally {
+                            msgfield.value='';
+                        }
                     }
                 }
             }

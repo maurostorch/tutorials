@@ -8,8 +8,12 @@ Session(app)
 subscriptions = {}
 
 def event(q):
-    while True:
-        yield 'data: '+ json.dumps(q.get()) + '\n\n'
+    connected = True
+    while connected:
+        try:
+            yield 'data: '+ json.dumps(q.get()) + '\n\n'
+        except:
+            connected = False
 
 @app.route("/")
 def root():
@@ -18,6 +22,14 @@ def root():
 @app.route("/<path:path>")
 def files(path):
     return send_from_directory('./',path)
+
+@app.route('/discover', methods=['GET'])
+def discover():
+    files = os.listdir('./calls')
+    for f in files:
+        if not os.path.isfile('./calls/'+f+'/answer'):
+            return f
+    return '',404
 
 @app.route("/offer/<callid>",methods=['GET','POST'])
 def offer(callid):
@@ -39,7 +51,7 @@ def offer(callid):
             f=open(wd+'offer','r')
             return f.read()
         except:
-            return 'not found'
+            return 'not found', 404
 
 @app.route("/answer/<callid>",methods=['GET','POST'])
 def answer(callid):
@@ -92,4 +104,7 @@ def candidate(ttype,callid):
         return Response(event(subscriptions[callid]['candidate-'+ttype]), mimetype="text/event-stream")
 
 if __name__ == "__main__":
-    app.run(threaded=True,debug=True)
+    try:
+        app.run(threaded=True,debug=True)
+    except:
+        print 'Interrupted...'
