@@ -66,7 +66,7 @@ ROOT_URLCONF = 'reactrest.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR+'/reactrest/static'],
+        'DIRS': [BASE_DIR+'/todo/static'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
