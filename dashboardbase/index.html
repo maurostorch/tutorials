@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/gridstack.min.css" />
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.11.0/jquery-ui.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.5.0/lodash.min.js"></script>
+  <script type="text/javascript" src="js/gridstack.min.js"></script>
+  <script src="js/gridstack.jQueryUI.min.js"></script>
+  <script src="https://d3js.org/d3.v4.min.js"></script>
+  <title></title>
+  <style media="screen">
+    .module {
+      width: 20px;
+      height: 20px;
+      background-color: red;
+    }
+
+    .grid-stack-item-content {
+      box-shadow: 5px 5px 5px gray;
+      padding: 15px;
+    }
+
+    * {
+      border: 0px dotted gray;
+    }
+
+    svg {
+      background-color: white;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="login" class="modal fade" tabindex="-1" role="dialog" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title">Admin - Login</h4>
+        </div>
+        <div class="modal-body">
+          <form id="loginform">
+            <div class="form-group">
+              <label for="exampleInputEmail1">Email address</label>
+              <input type="email" class="form-control" id="email" placeholder="Email">
+            </div>
+            <div class="form-group">
+              <label for="exampleInputPassword1">Password</label>
+              <input type="password" class="form-control" id="pass" placeholder="Password">
+            </div>
+            <button type="submit" class="btn btn-default">Submit</button>
+          </form>
+        </div>
+      </div>
+      <!-- /.modal-content -->
+    </div>
+    <!-- /.modal-dialog -->
+  </div>
+  <!-- /.modal -->
+  <div class="container-fluid hide" id="maincontainer">
+    <div class="row">
+      <div class="col-md-12">
+        <div class="page-header">
+          <h1>Dashboard <small>administration</small></h1>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-2">
+        <div class="list-group" id="menu">
+          <a href="#" class="list-group-item active" tview="home">Home</a>
+          <a href="#" class="list-group-item" tview="datamaintenance">Data Maintenance</a>
+          <a href="#" class="list-group-item" tview="logout">Logout</a>
+        </div>
+      </div>
+      <div class="col-md-10">
+        <div class="grid-stack" id="home">
+          <div class="grid-stack-item" data-gs-x="0" data-gs-y="0" data-gs-width="4" data-gs-height="2">
+            <div class="grid-stack-item-content bg-primary">
+              <h3>Chart 1</h3>
+              <img src="http://www.actiprosoftware.com/content/images/products/controls-wpf-charts/LineChartType.png" width="90%" alt="">
+            </div>
+          </div>
+          <div class="grid-stack-item" data-gs-x="5" data-gs-y="0" data-gs-width="4" data-gs-height="2">
+            <div class="grid-stack-item-content  bg-primary">
+              <h3>Chart 2</h3>
+
+            </div>
+          </div>
+        </div>
+        <div class="grid-stack" id="datamaintenance">
+          <div class="grid-stack-item" data-gs-x="0" data-gs-y="0" data-gs-width="4" data-gs-height="2">
+            <div class="grid-stack-item-content bg-primary">
+              <h3>SignedURLs</h3>
+              <div class="form-group">
+                <label for="exampleInputEmail1">Service</label>
+                <select class="form-control">
+                  <option>1</option>
+                  <option>2</option>
+                  <option>3</option>
+                  <option>4</option>
+                  <option>5</option>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-default">Submit</button>
+            </div>
+          </div>
+          <div class="grid-stack-item" data-gs-x="5" data-gs-y="0" data-gs-width="4" data-gs-height="2">
+            <div class="grid-stack-item-content  bg-primary">
+
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="logout" class="modal fade" tabindex="-1" role="dialog" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title">Logout</h4>
+        </div>
+        <div class="modal-body">
+          <h1>You are logged out!</h1>
+        </div>
+      </div>
+      <!-- /.modal-content -->
+    </div>
+    <!-- /.modal-dialog -->
+  </div>
+  <!-- /.modal -->
+
+  <script type="text/javascript">
+    var active = 'home';
+    $('#login').modal('show');
+    //$('#maincontainer').toggleClass('hide');
+
+    function loginform() {
+      console.log('logging in');
+      var user = $('#email').val();
+      var pass = $('#pass').val();
+      console.log(user + ":" + pass);
+
+      // TODO: add a ajax call
+      if (user == 'admin@a.com' && pass == 'admin') {
+        $('#maincontainer').toggleClass('hide');
+        $('#login').modal('hide');
+      } else {
+
+      }
+
+      return false;
+    }
+
+    function menuitem() {
+      var next = $(this).attr('tview');
+      if (next == 'logout') {
+        if (confirm('Confirm logging out?')) {
+          $('#logout').modal({
+            backdrop: 'static',
+            keyboard: false
+          });
+        }
+      } else {
+        $('[tview=' + active + ']').toggleClass('active');
+        $('#' + active).fadeOut('fast', function() {
+          $('#' + next).fadeIn('fast');
+          $('[tview=' + next + ']').toggleClass('active');
+          active = next;
+        });
+      }
+    }
+    $(function() {
+      var options = {
+        cellHeight: 150,
+        verticalMargin: 10,
+
+      };
+      $('#loginform').on('submit', loginform);
+      $('.grid-stack').gridstack(options);
+      $('.grid-stack').hide();
+      $('#' + active).fadeIn('fast')
+      $('#menu a').click(menuitem);
+    });
+  </script>
+</body>
+
+</html>
